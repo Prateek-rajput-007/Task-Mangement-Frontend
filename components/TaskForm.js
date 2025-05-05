@@ -54,35 +54,50 @@ export default function TaskForm({ task = null }) {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const taskData = {
-        title: formData.title,
-        description: formData.description,
-        dueDate: new Date(formData.dueDate).toISOString(),
-        priority: formData.priority,
-        status: formData.status,
-        ...(user?.role === 'admin' && formData.assignedTo && {
-          assignedTo: formData.assignedTo
-        }),
-      }
+  try {
+    const taskData = {
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      dueDate: new Date(formData.dueDate).toISOString(),
+      priority: formData.priority,
+      status: formData.status,
+      ...(user?.role === 'admin' && formData.assignedTo && {
+        assignedTo: formData.assignedTo
+      }),
+    };
 
-      if (task) {
-        await updateTask(task._id, taskData)
-      } else {
-        await createTask(taskData)
-      }
+    // Log the payload you're sending
+    console.log("Sending task data:", taskData);
 
-      fetchTasks()
-      router.push('/tasks')
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to save task')
-    } finally {
-      setLoading(false)
+    if (!taskData.title || !taskData.dueDate || !taskData.status || !taskData.priority) {
+      toast.error("Missing required fields.");
+      return;
     }
+
+    if (task) {
+      await updateTask(task._id, taskData);
+      toast.success("Task updated successfully");
+    } else {
+      await createTask(taskData);
+      toast.success("Task created successfully");
+    }
+
+    await fetchTasks();
+    router.push('/tasks');
+  } catch (error) {
+    console.error("Submit error:", error);
+    const errorMessage =
+      error?.response?.data?.message ||
+      error?.response?.data?.errors?.[0]?.message ||
+      "Failed to save task";
+    toast.error(errorMessage);
+  } finally {
+    setLoading(false);
   }
+};
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 dark:text-white">
