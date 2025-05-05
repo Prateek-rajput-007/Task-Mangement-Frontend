@@ -26,17 +26,17 @@ export default function TaskForm({ task = null }) {
   useEffect(() => {
     if (task) {
       setFormData({
-        title: task.title,
-        description: task.description,
-        dueDate: task.dueDate.split('T')[0],
-        priority: task.priority,
-        status: task.status,
+        title: task.title || '',
+        description: task.description || '',
+        dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+        priority: task.priority || 'medium',
+        status: task.status || 'todo',
         assignedTo: task.assignedTo?._id || '',
       })
     }
 
-    if (user?.role === 'admin') {
-      const fetchUsers = async () => {
+    const fetchUsers = async () => {
+      if (user?.role === 'admin') {
         try {
           const { data } = await api.get('/users')
           setUsers(data)
@@ -44,8 +44,9 @@ export default function TaskForm({ task = null }) {
           toast.error('Failed to fetch users')
         }
       }
-      fetchUsers()
     }
+
+    fetchUsers()
   }, [task, user])
 
   const handleChange = (e) => {
@@ -53,11 +54,33 @@ export default function TaskForm({ task = null }) {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+  const validateForm = () => {
+    const { title, dueDate, priority, status } = formData
+    if (!title.trim()) {
+      toast.error("Title is required")
+      return false
+    }
+    if (!dueDate) {
+      toast.error("Due Date is required")
+      return false
+    }
+    if (!priority) {
+      toast.error("Priority must be selected")
+      return false
+    }
+    if (!status) {
+      toast.error("Status must be selected")
+      return false
+    }
+    return true
+  }
 
-  try {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!validateForm()) return
+
+    setLoading(true)
+
     const taskData = {
       title: formData.title.trim(),
       description: formData.description.trim(),
@@ -65,86 +88,87 @@ export default function TaskForm({ task = null }) {
       priority: formData.priority,
       status: formData.status,
       ...(user?.role === 'admin' && formData.assignedTo && {
-        assignedTo: formData.assignedTo
+        assignedTo: formData.assignedTo,
       }),
-    };
-
-    // Log the payload you're sending
-    console.log("Sending task data:", taskData);
-
-    if (!taskData.title || !taskData.dueDate || !taskData.status || !taskData.priority) {
-      toast.error("Missing required fields.");
-      return;
     }
 
-    if (task) {
-      await updateTask(task._id, taskData);
-      toast.success("Task updated successfully");
-    } else {
-      await createTask(taskData);
-      toast.success("Task created successfully");
+    try {
+      if (task) {
+        await updateTask(task._id, taskData)
+        toast.success('Task updated successfully')
+      } else {
+        await createTask(taskData)
+        toast.success('Task created successfully')
+      }
+      await fetchTasks()
+      router.push('/tasks')
+    } catch (error) {
+      console.error('Submit error:', error)
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.errors?.[0]?.message ||
+        'Failed to save task'
+      toast.error(errorMessage)
+    } finally {
+      setLoading(false)
     }
-
-    await fetchTasks();
-    router.push('/tasks');
-  } catch (error) {
-    console.error("Submit error:", error);
-    const errorMessage =
-      error?.response?.data?.message ||
-      error?.response?.data?.errors?.[0]?.message ||
-      "Failed to save task";
-    toast.error(errorMessage);
-  } finally {
-    setLoading(false);
   }
-};
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 dark:text-white">
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Title */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title *</label>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title *</label>
           <input
-            type="text"
+            id="title"
             name="title"
+            type="text"
             required
             value={formData.title}
             onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
+            className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
           />
         </div>
 
+        {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
           <textarea
+            id="description"
             name="description"
             rows={3}
             value={formData.description}
             onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
+            className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
           />
         </div>
 
+        {/* Fields Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          {/* Due Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Date *</label>
+            <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Date *</label>
             <input
-              type="date"
+              id="dueDate"
               name="dueDate"
+              type="date"
               required
               value={formData.dueDate}
               onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
+              className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
             />
           </div>
 
+          {/* Priority */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
+            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
             <select
+              id="priority"
               name="priority"
               value={formData.priority}
               onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
+              className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -152,13 +176,15 @@ export default function TaskForm({ task = null }) {
             </select>
           </div>
 
+          {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+            <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
             <select
+              id="status"
               name="status"
               value={formData.status}
               onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
+              className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
             >
               <option value="todo">To Do</option>
               <option value="in-progress">In Progress</option>
@@ -166,14 +192,16 @@ export default function TaskForm({ task = null }) {
             </select>
           </div>
 
+          {/* Assign To (Only Admin) */}
           {user?.role === 'admin' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Assign To</label>
+              <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Assign To</label>
               <select
+                id="assignedTo"
                 name="assignedTo"
                 value={formData.assignedTo}
                 onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
+                className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
               >
                 <option value="">Unassigned</option>
                 {users.map(user => (
@@ -184,6 +212,7 @@ export default function TaskForm({ task = null }) {
           )}
         </div>
 
+        {/* Buttons */}
         <div className="flex justify-end gap-3">
           <button
             type="button"
