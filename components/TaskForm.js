@@ -109,7 +109,7 @@ export default function TaskForm({ task = null }) {
     const taskData = {
       title: formData.title.trim(),
       ...(formData.description.trim() && { description: formData.description.trim() }),
-      dueDate: new Date(formData.dueDate).toISOString(), // Send as full ISO string
+      dueDate: formData.dueDate, // Send as YYYY-MM-DD to match Postman
       priority: formData.priority,
       status: formData.status,
       ...(user?.role === 'admin' && formData.assignedTo && { assignedTo: formData.assignedTo }),
@@ -125,6 +125,7 @@ export default function TaskForm({ task = null }) {
         throw new Error('Task ID is missing')
       }
 
+      console.log('Raw form data:', formData)
       console.log('Submitting task request:', {
         url: task ? `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}` : 'https://task-management-backend-2ifw.onrender.com/api/tasks',
         method: task ? 'PUT' : 'POST',
