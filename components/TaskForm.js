@@ -28,7 +28,7 @@ export default function TaskForm({ task = null }) {
       setFormData({
         title: task.title || '',
         description: task.description || '',
-        dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
         priority: task.priority || 'medium',
         status: task.status || 'todo',
         assignedTo: task.assignedTo?._id || '',
@@ -39,15 +39,24 @@ export default function TaskForm({ task = null }) {
       if (user?.role === 'admin') {
         try {
           const token = localStorage.getItem('token')
+          if (!token) {
+            throw new Error('No token found in localStorage')
+          }
           const response = await axios.get('https://task-management-backend-2ifw.onrender.com/api/users', {
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': token ? `Bearer ${token}` : undefined,
+              'Authorization': `Bearer ${token}`,
             },
           })
           setUsers(response.data)
         } catch (error) {
-          console.error('Fetch users error:', error)
+          console.error('Fetch users error:', {
+            message: error.message,
+            response: error.response ? {
+              status: error.response.status,
+              data: error.response.data,
+            } : null,
+          })
           toast.error('Failed to fetch users')
         }
       }
@@ -91,21 +100,37 @@ export default function TaskForm({ task = null }) {
     const taskData = {
       title: formData.title.trim(),
       description: formData.description.trim(),
-      dueDate: new Date(formData.dueDate).toISOString(),
+      dueDate: formData.dueDate, // Send as YYYY-MM-DD to match Postman
       priority: formData.priority,
       status: formData.status,
-      ...(user?.role === 'admin' && formData.assignedTo && {
-        assignedTo: formData.assignedTo,
-      }),
+      assignedTo: user?.role === 'admin' && formData.assignedTo ? formData.assignedTo : null,
     }
 
     try {
-      console.log('Submitting task data:', JSON.stringify(taskData, null, 2))
       const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('No token found in localStorage')
+      }
+
+      if (task && !task._id) {
+        throw new Error('Task ID is missing')
+      }
+
+      console.log('Submitting task request:', {
+        url: task ? `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}` : 'https://task-management-backend-2ifw.onrender.com/api/tasks',
+        method: task ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: taskData,
+        token: token.substring(0, 20) + '...' // Log partial token for security
+      })
+
       const config = {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : undefined,
+          'Authorization': `Bearer ${token}`,
         },
       }
 
@@ -131,7 +156,8 @@ export default function TaskForm({ task = null }) {
         message: error.message,
         response: error.response ? {
           status: error.response.status,
-          data: JSON.stringify(error.response.data, null, 2),
+          data: error.response.data,
+          headers: error.response.headers,
         } : null,
       })
       const errorMessage =
