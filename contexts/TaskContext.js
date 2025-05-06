@@ -235,17 +235,19 @@ export function TaskProvider({ children }) {
   const [selectedTask, setSelectedTask] = useState(null)
   const [error, setError] = useState(null)
 
-  // Format task data before sending to API
   const formatTaskData = (taskData) => {
     const formattedData = {
       title: taskData.title?.trim() || '',
       description: taskData.description?.trim() || '',
       dueDate: taskData.dueDate ? new Date(taskData.dueDate).toISOString() : new Date().toISOString(),
-      priority: taskData.priority || 'medium',
-      status: taskData.status || 'todo',
+      priority: ['low', 'medium', 'high'].includes(taskData.priority) ? taskData.priority : 'medium',
+      status: ['todo', 'in-progress', 'completed'].includes(taskData.status) ? taskData.status : 'todo',
       assignedTo: taskData.assignedTo && taskData.assignedTo !== '' ? taskData.assignedTo : null,
     }
-    console.log('Formatted task data:', JSON.stringify(formattedData, null, 2)) // Debug log
+    if (!['low', 'medium', 'high'].includes(formattedData.priority)) {
+      console.error('Invalid priority detected:', taskData.priority);
+    }
+    console.log('Formatted task data:', JSON.stringify(formattedData, null, 2))
     return formattedData
   }
 
@@ -253,7 +255,7 @@ export function TaskProvider({ children }) {
     try {
       setLoading(true)
       setError(null)
-      console.log('Fetching tasks with params:', params) // Debug log
+      console.log('Fetching tasks with params:', params)
       const { data } = await api.get('/tasks', { params })
       setTasks(data)
       return data
@@ -277,7 +279,7 @@ export function TaskProvider({ children }) {
     try {
       setLoading(true)
       setError(null)
-      console.log('Fetching task stats') // Debug log
+      console.log('Fetching task stats')
       const { data } = await api.get('/tasks/stats')
       setStats(data)
       return data
@@ -301,13 +303,13 @@ export function TaskProvider({ children }) {
     try {
       setLoading(true)
       setError(null)
-      console.log('Fetching notifications') // Debug log
+      console.log('Fetching notifications')
       const { data } = await api.get('/notifications')
       setNotifications(data)
       return data
     } catch (error) {
       console.error('Fetch notifications error:', error)
-      console:error('Error details:', {
+      console.error('Error details:', {
         status: error.response?.status,
         data: JSON.stringify(error.response?.data, null, 2),
       })
@@ -326,7 +328,7 @@ export function TaskProvider({ children }) {
       setLoading(true)
       setError(null)
       const formattedData = formatTaskData(taskData)
-      console.log('Creating task with data:', JSON.stringify(formattedData, null, 2)) // Debug log
+      console.log('Creating task with data:', JSON.stringify(formattedData, null, 2))
       const { data } = await api.post('/tasks', formattedData)
       setTasks(prev => [data, ...prev])
       
@@ -357,7 +359,7 @@ export function TaskProvider({ children }) {
       setLoading(true)
       setError(null)
       const formattedData = formatTaskData(taskData)
-      console.log('Updating task with ID:', id, 'and data:', JSON.stringify(formattedData, null, 2)) // Debug log
+      console.log('Updating task with ID:', id, 'and data:', JSON.stringify(formattedData, null, 2))
       const { data } = await api.put(`/tasks/${id}`, formattedData)
       setTasks(prev => prev.map(task => task._id === id ? data : task))
       
@@ -388,7 +390,7 @@ export function TaskProvider({ children }) {
     try {
       setLoading(true)
       setError(null)
-      console.log('Deleting task with ID:', id) // Debug log
+      console.log('Deleting task with ID:', id)
       await api.delete(`/tasks/${id}`)
       setTasks(prev => prev.filter(task => task._id !== id))
       toast.success('Task deleted successfully!')
@@ -412,7 +414,7 @@ export function TaskProvider({ children }) {
     try {
       setLoading(true)
       setError(null)
-      console.log('Marking notification as read with ID:', id) // Debug log
+      console.log('Marking notification as read with ID:', id)
       const { data } = await api.put(`/notifications/${id}`, { read: true })
       setNotifications(prev => prev.map(n => n._id === id ? data : n))
       toast.success('Notification marked as read!')
