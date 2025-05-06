@@ -80,6 +80,10 @@ export default function TaskForm({ task = null }) {
       toast.error("Due Date is required")
       return false
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      toast.error("Due Date must be in YYYY-MM-DD format")
+      return false
+    }
     if (!priority) {
       toast.error("Priority must be selected")
       return false
@@ -99,11 +103,11 @@ export default function TaskForm({ task = null }) {
 
     const taskData = {
       title: formData.title.trim(),
-      description: formData.description.trim(),
+      description: formData.description.trim() || undefined,
       dueDate: formData.dueDate, // Send as YYYY-MM-DD to match Postman
       priority: formData.priority,
       status: formData.status,
-      assignedTo: user?.role === 'admin' && formData.assignedTo ? formData.assignedTo : null,
+      ...(user?.role === 'admin' && formData.assignedTo && { assignedTo: formData.assignedTo }),
     }
 
     try {
@@ -157,6 +161,7 @@ export default function TaskForm({ task = null }) {
         response: error.response ? {
           status: error.response.status,
           data: error.response.data,
+          errors: error.response.data.errors || null,
           headers: error.response.headers,
         } : null,
       })
