@@ -234,7 +234,9 @@
 //   )
 // }
 
-'use client'
+   
+
+     'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -297,6 +299,12 @@ export default function TaskForm({ task = null }) {
     } else if (isNaN(new Date(formData.dueDate).getTime())) {
       errors.dueDate = 'Invalid due date'
     }
+    if (!['low', 'medium', 'high'].includes(formData.priority)) {
+      errors.priority = 'Priority must be low, medium, or high'
+    }
+    if (!['todo', 'in-progress', 'completed'].includes(formData.status)) {
+      errors.status = 'Status must be todo, in-progress, or completed'
+    }
     if (user?.role === 'admin' && formData.assignedTo && !users.some(u => u._id === formData.assignedTo)) {
       errors.assignedTo = 'Invalid user selected'
     }
@@ -311,6 +319,7 @@ export default function TaskForm({ task = null }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    console.log('Form data before submission:', formData) // Debug log
     const errors = validateForm()
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors)
@@ -404,12 +413,15 @@ export default function TaskForm({ task = null }) {
               name="priority"
               value={formData.priority}
               onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
+              className={`mt-1 block w-full border rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm ${
+                formErrors.priority ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              }`}
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
             </select>
+            {formErrors.priority && <p className="mt-1 text-sm text-red-500">{formErrors.priority}</p>}
           </div>
 
           <div>
@@ -418,12 +430,15 @@ export default function TaskForm({ task = null }) {
               name="status"
               value={formData.status}
               onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
+              className={`mt-1 block w-full border rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm ${
+                formErrors.status ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              }`}
             >
               <option value="todo">To Do</option>
               <option value="in-progress">In Progress</option>
               <option value="completed">Completed</option>
             </select>
+            {formErrors.status && <p className="mt-1 text-sm text-red-500">{formErrors.status}</p>}
           </div>
 
           {user?.role === 'admin' && (
