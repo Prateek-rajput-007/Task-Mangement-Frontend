@@ -84,6 +84,11 @@ export default function TaskForm({ task = null }) {
       toast.error("Due Date must be in YYYY-MM-DD format")
       return false
     }
+    const date = new Date(dueDate)
+    if (isNaN(date.getTime())) {
+      toast.error("Due Date is invalid")
+      return false
+    }
     if (!priority) {
       toast.error("Priority must be selected")
       return false
@@ -103,8 +108,8 @@ export default function TaskForm({ task = null }) {
 
     const taskData = {
       title: formData.title.trim(),
-      description: formData.description.trim() || undefined,
-      dueDate: formData.dueDate, // Send as YYYY-MM-DD to match Postman
+      ...(formData.description.trim() && { description: formData.description.trim() }),
+      dueDate: new Date(formData.dueDate).toISOString(), // Send as full ISO string
       priority: formData.priority,
       status: formData.status,
       ...(user?.role === 'admin' && formData.assignedTo && { assignedTo: formData.assignedTo }),
@@ -166,8 +171,8 @@ export default function TaskForm({ task = null }) {
         } : null,
       })
       const errorMessage =
+        error?.response?.data?.errors?.[0]?.msg ||
         error?.response?.data?.message ||
-        error?.response?.data?.errors?.[0]?.message ||
         'Failed to save task'
       toast.error(errorMessage)
     } finally {
