@@ -245,7 +245,7 @@ export function TaskProvider({ children }) {
       status: taskData.status || 'todo',
       assignedTo: taskData.assignedTo && taskData.assignedTo !== '' ? taskData.assignedTo : null,
     }
-    console.log('Formatted task data:', formattedData) // Debug log
+    console.log('Formatted task data:', JSON.stringify(formattedData, null, 2)) // Debug log
     return formattedData
   }
 
@@ -261,7 +261,7 @@ export function TaskProvider({ children }) {
       console.error('Fetch tasks error:', error)
       console.error('Error details:', {
         status: error.response?.status,
-        data: error.response?.data,
+        data: JSON.stringify(error.response?.data, null, 2),
       })
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch tasks'
       const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
@@ -285,7 +285,7 @@ export function TaskProvider({ children }) {
       console.error('Fetch stats error:', error)
       console.error('Error details:', {
         status: error.response?.status,
-        data: error.response?.data,
+        data: JSON.stringify(error.response?.data, null, 2),
       })
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch stats'
       const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
@@ -307,9 +307,9 @@ export function TaskProvider({ children }) {
       return data
     } catch (error) {
       console.error('Fetch notifications error:', error)
-      console.error('Error details:', {
+      console:error('Error details:', {
         status: error.response?.status,
-        data: error.response?.data,
+        data: JSON.stringify(error.response?.data, null, 2),
       })
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch notifications'
       const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
@@ -326,7 +326,7 @@ export function TaskProvider({ children }) {
       setLoading(true)
       setError(null)
       const formattedData = formatTaskData(taskData)
-      console.log('Creating task with data:', formattedData) // Debug log
+      console.log('Creating task with data:', JSON.stringify(formattedData, null, 2)) // Debug log
       const { data } = await api.post('/tasks', formattedData)
       setTasks(prev => [data, ...prev])
       
@@ -340,7 +340,7 @@ export function TaskProvider({ children }) {
       console.error('Create task error:', error)
       console.error('Error details:', {
         status: error.response?.status,
-        data: error.response?.data,
+        data: JSON.stringify(error.response?.data, null, 2),
       })
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to create task'
       const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
@@ -357,7 +357,7 @@ export function TaskProvider({ children }) {
       setLoading(true)
       setError(null)
       const formattedData = formatTaskData(taskData)
-      console.log('Updating task with ID:', id, 'and data:', formattedData) // Debug log
+      console.log('Updating task with ID:', id, 'and data:', JSON.stringify(formattedData, null, 2)) // Debug log
       const { data } = await api.put(`/tasks/${id}`, formattedData)
       setTasks(prev => prev.map(task => task._id === id ? data : task))
       
@@ -372,7 +372,7 @@ export function TaskProvider({ children }) {
       console.error('Update task error:', error)
       console.error('Error details:', {
         status: error.response?.status,
-        data: error.response?.data,
+        data: JSON.stringify(error.response?.data, null, 2),
       })
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update task'
       const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
@@ -396,7 +396,7 @@ export function TaskProvider({ children }) {
       console.error('Delete task error:', error)
       console.error('Error details:', {
         status: error.response?.status,
-        data: error.response?.data,
+        data: JSON.stringify(error.response?.data, null, 2),
       })
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to delete task'
       const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
@@ -420,7 +420,7 @@ export function TaskProvider({ children }) {
       console.error('Mark notification read error:', error)
       console.error('Error details:', {
         status: error.response?.status,
-        data: error.response?.data,
+        data: JSON.stringify(error.response?.data, null, 2),
       })
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update notification'
       const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
