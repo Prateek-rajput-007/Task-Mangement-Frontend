@@ -235,253 +235,247 @@
 // }
 
    
+'use client'
 
-     'use client'
-
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useTasks } from '../contexts/TaskContext'
-import { useAuth } from '../contexts/AuthContext'
-import api from '../lib/api'
+import { createContext, useContext, useState } from 'react'
 import { toast } from 'react-hot-toast'
+import api from '../lib/api'
 
-export default function TaskForm({ task = null }) {
-  const { user } = useAuth()
-  const { createTask, updateTask, fetchTasks } = useTasks()
-  const router = useRouter()
+const TaskContext = createContext()
 
-  const [users, setUsers] = useState([])
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    dueDate: task ? new Date(task.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    priority: 'medium',
-    status: 'todo',
-    assignedTo: '',
-  })
-  const [formErrors, setFormErrors] = useState({})
+export function TaskProvider({ children }) {
+  const [tasks, setTasks] = useState([])
+  const [stats, setStats] = useState(null)
+  const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    if (task) {
-      setFormData({
-        title: task.title || '',
-        description: task.description || '',
-        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        priority: task.priority || 'medium',
-        status: task.status || 'todo',
-        assignedTo: task.assignedTo?._id || '',
-      })
+  const formatTaskData = (taskData) => {
+    const formattedData = {
+      title: taskData.title?.trim() || '',
+      description: taskData.description?.trim() || '',
+      dueDate: taskData.dueDate ? new Date(taskData.dueDate).toISOString() : new Date().toISOString(),
+      priority: ['low', 'medium', 'high'].includes(taskData.priority) ? taskData.priority : 'medium',
+      status: ['todo', 'in-progress', 'completed'].includes(taskData.status) ? taskData.status : 'todo',
+      assignedTo: taskData.assignedTo && taskData.assignedTo !== '' ? taskData.assignedTo : null,
     }
-
-    if (user?.role === 'admin') {
-      const fetchUsers = async () => {
-        try {
-          console.log('Fetching users for admin') // Debug log
-          const { data } = await api.get('/users')
-          setUsers(data)
-        } catch (error) {
-          console.error('Fetch users error:', error)
-          toast.error(error.response?.data?.message || 'Failed to fetch users')
-        }
-      }
-      fetchUsers()
+    if (!['low', 'medium', 'high'].includes(formattedData.priority)) {
+      console.error('Invalid priority detected:', taskData.priority);
     }
-  }, [task, user])
-
-  const validateForm = () => {
-    const errors = {}
-    if (!formData.title.trim()) {
-      errors.title = 'Title is required'
-    }
-    if (!formData.dueDate) {
-      errors.dueDate = 'Due date is required'
-    } else if (isNaN(new Date(formData.dueDate).getTime())) {
-      errors.dueDate = 'Invalid due date'
-    }
-    if (!['low', 'medium', 'high'].includes(formData.priority)) {
-      errors.priority = 'Priority must be low, medium, or high'
-    }
-    if (!['todo', 'in-progress', 'completed'].includes(formData.status)) {
-      errors.status = 'Status must be todo, in-progress, or completed'
-    }
-    if (user?.role === 'admin' && formData.assignedTo && !users.some(u => u._id === formData.assignedTo)) {
-      errors.assignedTo = 'Invalid user selected'
-    }
-    return errors
+    console.log('Formatted task data:', JSON.stringify(formattedData, null, 2))
+    return formattedData
   }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-    setFormErrors(prev => ({ ...prev, [name]: null })) // Clear error on change
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    console.log('Form data before submission:', formData) // Debug log
-    const errors = validateForm()
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors)
-      toast.error('Please fix form errors')
-      return
-    }
-
-    setLoading(true)
+  const fetchTasks = async (params = {}) => {
     try {
-      const taskData = {
-        title: formData.title,
-        description: formData.description,
-        dueDate: new Date(formData.dueDate).toISOString(),
-        priority: formData.priority,
-        status: formData.status,
-        ...(user?.role === 'admin' && formData.assignedTo && { assignedTo: formData.assignedTo }),
-      }
-      console.log('Submitting task data:', taskData) // Debug log
-
-      if (task) {
-        await updateTask(task._id, taskData)
-      } else {
-        await createTask(taskData)
-      }
-
-      await fetchTasks()
-      toast.success(task ? 'Task updated successfully!' : 'Task created successfully!')
-      router.push('/tasks')
+      setLoading(true)
+      setError(null)
+      console.log('Fetching tasks with params:', params)
+      const { data } = await api.get('/tasks', { params })
+      setTasks(data)
+      return data
     } catch (error) {
-      console.error('Submit error:', error)
+      console.error('Fetch tasks error:', error)
       console.error('Error details:', {
         status: error.response?.status,
-        data: error.response?.data,
+        data: JSON.stringify(error.response?.data, null, 2),
       })
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to save task'
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch tasks'
       const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
+      setError(errors.length > 0 ? errors.join(', ') : errorMessage)
       toast.error(errors.length > 0 ? errors.join(', ') : errorMessage)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchTaskStats = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      console.log('Fetching task stats')
+      const { data } = await api.get('/tasks/stats')
+      setStats(data)
+      return data
+    } catch (error) {
+      console.error('Fetch stats error:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: JSON.stringify(error.response?.data, null, 2),
+      })
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch stats'
+      const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
+      setError(errors.length > 0 ? errors.join(', ') : errorMessage)
+      toast.error(errors.length > 0 ? errors.join(', ') : errorMessage)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      console.log('Fetching notifications')
+      const { data } = await api.get('/notifications')
+      setNotifications(data)
+      return data
+    } catch (error) {
+      console.error('Fetch notifications error:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: JSON.stringify(error.response?.data, null, 2),
+      })
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch notifications'
+      const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
+      setError(errors.length > 0 ? errors.join(', ') : errorMessage)
+      toast.error(errors.length > 0 ? errors.join(', ') : errorMessage)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const createTask = async (taskData) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const formattedData = formatTaskData(taskData)
+      console.log('Creating task with data:', JSON.stringify(formattedData, null, 2))
+      const { data } = await api.post('/tasks', formattedData)
+      setTasks(prev => [data, ...prev])
+      
+      if (formattedData.assignedTo) {
+        await fetchNotifications()
+      }
+      
+      toast.success('Task created successfully!')
+      return data
+    } catch (error) {
+      console.error('Create task error:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: JSON.stringify(error.response?.data, null, 2),
+      })
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to create task'
+      const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
+      setError(errors.length > 0 ? errors.join(', ') : errorMessage)
+      toast.error(errors.length > 0 ? errors.join(', ') : errorMessage)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updateTask = async (id, taskData) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const formattedData = formatTaskData(taskData)
+      console.log('Updating task with ID:', id, 'and data:', JSON.stringify(formattedData, null, 2))
+      const { data } = await api.put(`/tasks/${id}`, formattedData)
+      setTasks(prev => prev.map(task => task._id === id ? data : task))
+      
+      const originalTask = tasks.find(t => t._id === id)
+      if (formattedData.assignedTo !== originalTask?.assignedTo?._id) {
+        await fetchNotifications()
+      }
+      
+      toast.success('Task updated successfully!')
+      return data
+    } catch (error) {
+      console.error('Update task error:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: JSON.stringify(error.response?.data, null, 2),
+      })
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update task'
+      const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
+      setError(errors.length > 0 ? errors.join(', ') : errorMessage)
+      toast.error(errors.length > 0 ? errors.join(', ') : errorMessage)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const deleteTask = async (id) => {
+    try {
+      setLoading(true)
+      setError(null)
+      console.log('Deleting task with ID:', id)
+      await api.delete(`/tasks/${id}`)
+      setTasks(prev => prev.filter(task => task._id !== id))
+      toast.success('Task deleted successfully!')
+    } catch (error) {
+      console.error('Delete task error:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: JSON.stringify(error.response?.data, null, 2),
+      })
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to delete task'
+      const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
+      setError(errors.length > 0 ? errors.join(', ') : errorMessage)
+      toast.error(errors.length > 0 ? errors.join(', ') : errorMessage)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const markNotificationAsRead = async (id) => {
+    try {
+      setLoading(true)
+      setError(null)
+      console.log('Marking notification as read with ID:', id)
+      const { data } = await api.put(`/notifications/${id}`, { read: true })
+      setNotifications(prev => prev.map(n => n._id === id ? data : n))
+      toast.success('Notification marked as read!')
+    } catch (error) {
+      console.error('Mark notification read error:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: JSON.stringify(error.response?.data, null, 2),
+      })
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update notification'
+      const errors = error.response?.data?.errors?.map(err => err.msg || err) || []
+      setError(errors.length > 0 ? errors.join(', ') : errorMessage)
+      toast.error(errors.length > 0 ? errors.join(', ') : errorMessage)
+      throw error
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 dark:text-white">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title *</label>
-          <input
-            type="text"
-            name="title"
-            required
-            value={formData.title}
-            onChange={handleChange}
-            className={`mt-1 block w-full border rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm ${
-              formErrors.title ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-            }`}
-          />
-          {formErrors.title && <p className="mt-1 text-sm text-red-500">{formErrors.title}</p>}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-          <textarea
-            name="description"
-            rows={3}
-            value={formData.description}
-            onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Date *</label>
-            <input
-              type="date"
-              name="dueDate"
-              required
-              value={formData.dueDate}
-              onChange={handleChange}
-              className={`mt-1 block w-full border rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm ${
-                formErrors.dueDate ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-              }`}
-            />
-            {formErrors.dueDate && <p className="mt-1 text-sm text-red-500">{formErrors.dueDate}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-            <select
-              name="priority"
-              value={formData.priority}
-              onChange={handleChange}
-              className={`mt-1 block w-full border rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm ${
-                formErrors.priority ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-              }`}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-            {formErrors.priority && <p className="mt-1 text-sm text-red-500">{formErrors.priority}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              className={`mt-1 block w-full border rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm ${
-                formErrors.status ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-              }`}
-            >
-              <option value="todo">To Do</option>
-              <option value="in-progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </select>
-            {formErrors.status && <p className="mt-1 text-sm text-red-500">{formErrors.status}</p>}
-          </div>
-
-          {user?.role === 'admin' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Assign To</label>
-              <select
-                name="assignedTo"
-                value={formData.assignedTo}
-                onChange={handleChange}
-                className={`mt-1 block w-full border rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 sm:text-sm ${
-                  formErrors.assignedTo ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                }`}
-              >
-                <option value="">Unassigned</option>
-                {users.map(user => (
-                  <option key={user._id} value={user._id}>{user.name}</option>
-                ))}
-              </select>
-              {formErrors.assignedTo && <p className="mt-1 text-sm text-red-500">{formErrors.assignedTo}</p>}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => router.push('/tasks')}
-            className="px-4 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className={`px-4 py-2 text-sm rounded-md text-white bg-blue-600 hover:bg-blue-700 ${
-              loading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            {loading ? 'Saving...' : task ? 'Update Task' : 'Create Task'}
-          </button>
-        </div>
-      </form>
-    </div>
+    <TaskContext.Provider value={{
+      tasks,
+      stats,
+      notifications,
+      loading,
+      error,
+      selectedTask,
+      setSelectedTask,
+      fetchTasks,
+      fetchTaskStats,
+      fetchNotifications,
+      createTask,
+      updateTask,
+      deleteTask,
+      markNotificationAsRead
+    }}>
+      {children}
+    </TaskContext.Provider>
   )
+}
+
+export function useTasks() {
+  const context = useContext(TaskContext)
+  if (context === undefined) {
+    throw new Error('useTasks must be used within a TaskProvider')
+  }
+  return context
 }
