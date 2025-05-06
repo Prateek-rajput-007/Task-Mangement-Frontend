@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTasks } from '../contexts/TaskContext'
 import { useAuth } from '../contexts/AuthContext'
-import api from '../lib/api'
+import axios from 'axios'
 import { toast } from 'react-hot-toast'
 
 export default function TaskForm({ task = null }) {
   const { user } = useAuth()
-  const { createTask, updateTask, fetchTasks } = useTasks()
+  const { fetchTasks } = useTasks()
   const router = useRouter()
 
   const [users, setUsers] = useState([])
@@ -38,9 +38,16 @@ export default function TaskForm({ task = null }) {
     const fetchUsers = async () => {
       if (user?.role === 'admin') {
         try {
-          const { data } = await api.get('/users')
-          setUsers(data)
-        } catch {
+          const token = localStorage.getItem('token')
+          const response = await axios.get('https://task-management-backend-2ifw.onrender.com/api/users', {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : undefined,
+            },
+          })
+          setUsers(response.data)
+        } catch (error) {
+          console.error('Fetch users error:', error)
           toast.error('Failed to fetch users')
         }
       }
@@ -93,11 +100,27 @@ export default function TaskForm({ task = null }) {
     }
 
     try {
+      const token = localStorage.getItem('token')
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : undefined,
+        },
+      }
+
       if (task) {
-        await updateTask(task._id, taskData)
+        await axios.put(
+          `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}`,
+          taskData,
+          config
+        )
         toast.success('Task updated successfully')
       } else {
-        await createTask(taskData)
+        await axios.post(
+          'https://task-management-backend-2ifw.onrender.com/api/tasks',
+          taskData,
+          config
+        )
         toast.success('Task created successfully')
       }
       await fetchTasks()
