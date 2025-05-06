@@ -100,6 +100,7 @@ export default function TaskForm({ task = null }) {
     }
 
     try {
+      console.log('Submitting task data:', JSON.stringify(taskData, null, 2))
       const token = localStorage.getItem('token')
       const config = {
         headers: {
@@ -126,7 +127,13 @@ export default function TaskForm({ task = null }) {
       await fetchTasks()
       router.push('/tasks')
     } catch (error) {
-      console.error('Submit error:', error)
+      console.error('Submit error:', {
+        message: error.message,
+        response: error.response ? {
+          status: error.response.status,
+          data: JSON.stringify(error.response.data, null, 2),
+        } : null,
+      })
       const errorMessage =
         error?.response?.data?.message ||
         error?.response?.data?.errors?.[0]?.message ||
