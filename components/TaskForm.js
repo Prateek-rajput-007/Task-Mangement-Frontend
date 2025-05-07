@@ -9,7 +9,7 @@ import { toast } from 'react-hot-toast'
 import { formatAPIDate } from '../lib/utils'
 
 export default function TaskForm({ task = null }) {
-  const { user } = useAuth()
+const { user } = useAuth()
   const { fetchTasks } = useTasks()
   const router = useRouter()
 
@@ -40,32 +40,20 @@ export default function TaskForm({ task = null }) {
       if (user?.role === 'admin') {
         try {
           const token = localStorage.getItem('token')
-          if (!token) {
-            throw new Error('No token found in localStorage')
-          }
-          const response = await axios.get('https://task-management-backend-2ifw.onrender.com/api/users', {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            transformRequest: [(data, headers) => {
-              // Clean headers if needed
-              const cleanHeaders = {...headers}
-              delete cleanHeaders.priority
-              delete cleanHeaders.dueDate
-              delete cleanHeaders.status
-              return JSON.stringify(data)
-            }]
-          })
+          if (!token) throw new Error('No token found')
+          
+          const response = await axios.get(
+            'https://task-management-backend-2ifw.onrender.com/api/users', 
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              }
+            }
+          )
           setUsers(response.data)
         } catch (error) {
-          console.error('Fetch users error:', {
-            message: error.message,
-            response: error.response ? {
-              status: error.response.status,
-              data: error.response.data,
-            } : null,
-          })
+          console.error('Fetch users error:', error)
           toast.error('Failed to fetch users')
         }
       }
@@ -80,25 +68,18 @@ export default function TaskForm({ task = null }) {
   }
 
   const validateForm = () => {
-    const { title, dueDate } = formData
-    
-    if (!title.trim()) {
-      toast.error("Title is required")
+    if (!formData.title.trim()) {
+      toast.error('Title is required')
       return false
     }
-    
-    if (!dueDate) {
-      toast.error("Due Date is required")
+    if (!formData.dueDate) {
+      toast.error('Due date is required')
       return false
     }
-    
-    try {
-      new Date(dueDate).toISOString() // Validate date format
-    } catch (error) {
-      toast.error("Due Date is invalid")
+    if (isNaN(new Date(formData.dueDate).getTime())) {
+      toast.error('Invalid due date')
       return false
     }
-    
     return true
   }
 
@@ -108,79 +89,69 @@ export default function TaskForm({ task = null }) {
 
     setLoading(true)
 
-    // Create clean task data object
-    const taskData = {
-      title: formData.title.trim(),
-      description: formData.description.trim(),
-      dueDate: formData.dueDate,
-      priority: formData.priority,
-      status: formData.status,
-    }
-
-    // Only add assignedTo if it's valid and user is admin
-    if (user?.role === 'admin' && formData.assignedTo && /^[0-9a-fA-F]{24}$/.test(formData.assignedTo)) {
-      taskData.assignedTo = formData.assignedTo
-    }
-
     try {
       const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No token found in localStorage')
+      if (!token) throw new Error('No authentication token found')
+
+      const taskData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        dueDate: new Date(formData.dueDate).toISOString(),
+        priority: formData.priority,
+        status: formData.status,
+        createdBy: user.id, // Ensure createdBy is included
+      }
+
+      if (user?.role === 'admin' && formData.assignedTo) {
+        taskData.assignedTo = formData.assignedTo
       }
 
       const config = {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-        },
-        transformRequest: [(data, headers) => {
-          // Clean headers to prevent any task data from leaking into headers
-          const cleanHeaders = {...headers}
-          delete cleanHeaders.priority
-          delete cleanHeaders.dueDate
-          delete cleanHeaders.status
-          delete cleanHeaders.title
-          delete cleanHeaders.description
-          return JSON.stringify(data)
-        }]
+        }
       }
 
-      if (task) {
-        await axios.put(
-          `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}`,
-          taskData,
-          config
-        )
-        toast.success('Task updated successfully')
+      console.log('Sending task data:', taskData) // Debug log
+
+      const url = task 
+        ? `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}`
+        : 'https://task-management-backend-2ifw.onrender.com/api/tasks'
+
+      const method = task ? 'put' : 'post'
+
+      const response = await axios[method](url, taskData, config)
+
+      if (response.status >= 200 && response.status < 300) {
+        toast.success(`Task ${task ? 'updated' : 'created'} successfully`)
+        await fetchTasks()
+        router.push('/tasks')
       } else {
-        await axios.post(
-          'https://task-management-backend-2ifw.onrender.com/api/tasks',
-          taskData,
-          config
-        )
-        toast.success('Task created successfully')
+        throw new Error(response.data.message || 'Request failed')
       }
-      
-      await fetchTasks()
-      router.push('/tasks')
     } catch (error) {
-      console.error('Submit error:', {
+      console.error('API Error Details:', {
         message: error.message,
-        response: error.response ? {
-          status: error.response.status,
-          data: error.response.data,
-          errors: error.response.data.errors || null,
-        } : null,
+        response: error.response?.data,
+        status: error.response?.status,
       })
-      
-      const errorMessage = error.response?.data?.message || 
-                         error.response?.data?.error?.message || 
-                         'Failed to save task'
+
+      let errorMessage = 'Failed to save task'
+      if (error.response?.data?.errors) {
+        errorMessage = error.response.data.errors.map(e => e.msg || e.message).join(', ')
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+
       toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 dark:text-white">
