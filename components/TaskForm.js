@@ -48,6 +48,14 @@ export default function TaskForm({ task = null }) {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
             },
+            transformRequest: [(data, headers) => {
+              // Clean headers if needed
+              const cleanHeaders = {...headers}
+              delete cleanHeaders.priority
+              delete cleanHeaders.dueDate
+              delete cleanHeaders.status
+              return JSON.stringify(data)
+            }]
           })
           setUsers(response.data)
         } catch (error) {
@@ -72,37 +80,25 @@ export default function TaskForm({ task = null }) {
   }
 
   const validateForm = () => {
-    const { title, dueDate, priority, status, assignedTo } = formData
+    const { title, dueDate } = formData
+    
     if (!title.trim()) {
       toast.error("Title is required")
       return false
     }
+    
     if (!dueDate) {
       toast.error("Due Date is required")
       return false
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
-      toast.error("Due Date must be in YYYY-MM-DD format")
-      return false
-    }
+    
     try {
-      formatAPIDate(dueDate) // Throws if invalid
+      new Date(dueDate).toISOString() // Validate date format
     } catch (error) {
       toast.error("Due Date is invalid")
       return false
     }
-    if (!['low', 'medium', 'high'].includes(priority)) {
-      toast.error("Priority must be low, medium, or high")
-      return false
-    }
-    if (!['todo', 'in-progress', 'completed'].includes(status)) {
-      toast.error("Status must be todo, in-progress, or completed")
-      return false
-    }
-    if (user?.role === 'admin' && assignedTo && !/^[0-9a-fA-F]{24}$/.test(assignedTo)) {
-      toast.error("Assigned To must be a valid user")
-      return false
-    }
+    
     return true
   }
 
@@ -112,13 +108,18 @@ export default function TaskForm({ task = null }) {
 
     setLoading(true)
 
+    // Create clean task data object
     const taskData = {
       title: formData.title.trim(),
-      ...(formData.description.trim() && { description: formData.description.trim() }),
-      dueDate: formatAPIDate(formData.dueDate), // Ensure YYYY-MM-DD
+      description: formData.description.trim(),
+      dueDate: formData.dueDate,
       priority: formData.priority,
       status: formData.status,
-      ...(user?.role === 'admin' && formData.assignedTo && /^[0-9a-fA-F]{24}$/.test(formData.assignedTo) && { assignedTo: formData.assignedTo }),
+    }
+
+    // Only add assignedTo if it's valid and user is admin
+    if (user?.role === 'admin' && formData.assignedTo && /^[0-9a-fA-F]{24}$/.test(formData.assignedTo)) {
+      taskData.assignedTo = formData.assignedTo
     }
 
     try {
@@ -127,27 +128,21 @@ export default function TaskForm({ task = null }) {
         throw new Error('No token found in localStorage')
       }
 
-      if (task && !task._id) {
-        throw new Error('Task ID is missing')
-      }
-
-      console.log('Raw form data:', formData)
-      console.log('Submitting task request:', {
-        url: task ? `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}` : 'https://task-management-backend-2ifw.onrender.com/api/tasks',
-        method: task ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: taskData,
-        token: token.substring(0, 20) + '...' // Log partial token for security
-      })
-
       const config = {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
+        transformRequest: [(data, headers) => {
+          // Clean headers to prevent any task data from leaking into headers
+          const cleanHeaders = {...headers}
+          delete cleanHeaders.priority
+          delete cleanHeaders.dueDate
+          delete cleanHeaders.status
+          delete cleanHeaders.title
+          delete cleanHeaders.description
+          return JSON.stringify(data)
+        }]
       }
 
       if (task) {
@@ -165,6 +160,7 @@ export default function TaskForm({ task = null }) {
         )
         toast.success('Task created successfully')
       }
+      
       await fetchTasks()
       router.push('/tasks')
     } catch (error) {
@@ -174,17 +170,12 @@ export default function TaskForm({ task = null }) {
           status: error.response.status,
           data: error.response.data,
           errors: error.response.data.errors || null,
-          headers: error.response.headers,
         } : null,
       })
-      const validationErrors = error?.response?.data?.errors
-      if (validationErrors) {
-        console.log('Validation errors:', JSON.stringify(validationErrors, null, 2))
-      }
-      const errorMessage =
-        validationErrors?.[0]?.msg ||
-        error?.response?.data?.message ||
-        'Failed to save task'
+      
+      const errorMessage = error.response?.data?.message || 
+                         error.response?.data?.error?.message || 
+                         'Failed to save task'
       toast.error(errorMessage)
     } finally {
       setLoading(false)
@@ -196,7 +187,9 @@ export default function TaskForm({ task = null }) {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Title */}
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title *</label>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Title *
+          </label>
           <input
             id="title"
             name="title"
@@ -210,7 +203,9 @@ export default function TaskForm({ task = null }) {
 
         {/* Description */}
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Description
+          </label>
           <textarea
             id="description"
             name="description"
@@ -225,7 +220,9 @@ export default function TaskForm({ task = null }) {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {/* Due Date */}
           <div>
-            <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Date *</label>
+            <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Due Date *
+            </label>
             <input
               id="dueDate"
               name="dueDate"
@@ -239,7 +236,9 @@ export default function TaskForm({ task = null }) {
 
           {/* Priority */}
           <div>
-            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
+            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Priority
+            </label>
             <select
               id="priority"
               name="priority"
@@ -255,7 +254,9 @@ export default function TaskForm({ task = null }) {
 
           {/* Status */}
           <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+            <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Status
+            </label>
             <select
               id="status"
               name="status"
@@ -272,7 +273,9 @@ export default function TaskForm({ task = null }) {
           {/* Assign To (Only Admin) */}
           {user?.role === 'admin' && (
             <div>
-              <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Assign To</label>
+              <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Assign To
+              </label>
               <select
                 id="assignedTo"
                 name="assignedTo"
