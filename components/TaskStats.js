@@ -86,7 +86,6 @@
 //   );
 // }
 
-
 'use client'
 
 import { useTasks } from '../contexts/TaskContext';
@@ -94,9 +93,7 @@ import { useEffect, useState } from 'react';
 
 export default function TaskStats() {
   const { stats, fetchTaskStats, error } = useTasks();
-  const [retryCount, setRetryCount] = useState(0);
   const [localError, setLocalError] = useState(null);
-  const maxRetries = 3;
 
   useEffect(() => {
     const attemptFetch = async () => {
@@ -109,24 +106,17 @@ export default function TaskStats() {
       } catch (err) {
         console.error('TaskStats fetch error:', {
           message: err.message,
-          status: err.response?.status,
-          data: err.response?.data,
+          stack: err.stack,
         });
-        setLocalError(err.response?.data?.message || 'Failed to fetch task statistics');
-        if (retryCount < maxRetries) {
-          console.log(`Retrying fetchTaskStats (${retryCount + 1}/${maxRetries})`);
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-          }, 2000);
-        }
+        setLocalError('Failed to load task statistics');
       }
     };
     attemptFetch();
-  }, [fetchTaskStats, retryCount]);
+  }, [fetchTaskStats]);
 
   const handleRetry = () => {
-    setRetryCount(0);
     setLocalError(null);
+    fetchTaskStats();
   };
 
   const StatCard = ({ title, value, icon, color }) => (
@@ -151,10 +141,10 @@ export default function TaskStats() {
     </div>
   );
 
-  if ((error || localError) && retryCount >= maxRetries) {
+  if (error || localError) {
     return (
       <div className="text-red-400 text-center p-4 bg-gray-800 rounded-lg shadow">
-        <p>{localError || error || `Failed to load task statistics after ${maxRetries} attempts.`}</p>
+        <p>{localError || error || 'Failed to load task statistics.'}</p>
         <button
           onClick={handleRetry}
           className="mt-2 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400"
