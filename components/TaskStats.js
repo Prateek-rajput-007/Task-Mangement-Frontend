@@ -1,14 +1,28 @@
 'use client'
 
 import { useTasks } from '../contexts/TaskContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function TaskStats() {
   const { stats, fetchTaskStats, error } = useTasks();
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
 
   useEffect(() => {
-    fetchTaskStats();
-  }, [fetchTaskStats]);
+    const attemptFetch = async () => {
+      try {
+        await fetchTaskStats();
+      } catch (err) {
+        if (retryCount < maxRetries) {
+          console.log(`Retrying fetchTaskStats (${retryCount + 1}/${maxRetries})`);
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, 2000);
+        }
+      }
+    };
+    attemptFetch();
+  }, [fetchTaskStats, retryCount]);
 
   const StatCard = ({ title, value, icon, color }) => (
     <div className="bg-gray-800 overflow-hidden shadow rounded-lg">
@@ -32,10 +46,10 @@ export default function TaskStats() {
     </div>
   );
 
-  if (error) {
+  if (error && retryCount >= maxRetries) {
     return (
       <div className="text-red-400 text-center p-4">
-        Failed to load task statistics. Please try again later.
+        Failed to load task statistics after {maxRetries} attempts. Please try again later.
       </div>
     );
   }
