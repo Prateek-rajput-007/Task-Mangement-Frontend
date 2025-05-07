@@ -6,6 +6,7 @@ import { useTasks } from '../contexts/TaskContext'
 import { useAuth } from '../contexts/AuthContext'
 import axios from 'axios'
 import { toast } from 'react-hot-toast'
+import { formatAPIDate } from '../lib/utils'
 
 export default function TaskForm({ task = null }) {
   const { user } = useAuth()
@@ -89,12 +90,12 @@ export default function TaskForm({ task = null }) {
       toast.error("Due Date is invalid")
       return false
     }
-    if (!priority) {
-      toast.error("Priority must be selected")
+    if (!['low', 'medium', 'high'].includes(priority)) {
+      toast.error("Priority must be low, medium, or high")
       return false
     }
-    if (!status) {
-      toast.error("Status must be selected")
+    if (!['todo', 'in-progress', 'completed'].includes(status)) {
+      toast.error("Status must be todo, in-progress, or completed")
       return false
     }
     return true
@@ -109,10 +110,10 @@ export default function TaskForm({ task = null }) {
     const taskData = {
       title: formData.title.trim(),
       ...(formData.description.trim() && { description: formData.description.trim() }),
-      dueDate: formData.dueDate, // Send as YYYY-MM-DD to match Postman
+      dueDate: formatAPIDate(formData.dueDate), // Ensure YYYY-MM-DD
       priority: formData.priority,
       status: formData.status,
-      ...(user?.role === 'admin' && formData.assignedTo && { assignedTo: formData.assignedTo }),
+      ...(user?.role === 'admin' && formData.assignedTo && formData.assignedTo !== '' && { assignedTo: formData.assignedTo }),
     }
 
     try {
