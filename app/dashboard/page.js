@@ -92,13 +92,12 @@
 
 'use client';
 
-import { useEffect } from 'react';
-import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
-import TaskStats from '../components/TaskStats';
-import { useTasks } from '../contexts/TaskContext';
-import { useAuth } from '../contexts/AuthContext';
-
+import { useEffect } from 'react'
+import Header from '../../components/Header'
+import Sidebar from '../../components/Sidebar'
+import TaskStats from '../../components/TaskStats'
+import { useTasks } from '../../contexts/TaskContext'
+import { useAuth } from '../../contexts/AuthContext'
 export default function DashboardPage() {
   const { user } = useAuth();
   const { tasks, stats, loading, error, fetchTasks, fetchTaskStats } = useTasks();
