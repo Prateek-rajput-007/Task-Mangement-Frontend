@@ -1,17 +1,14 @@
-// client/components/TaskStats.jsx
 'use client'
 
 import { useTasks } from '../contexts/TaskContext';
 import { useEffect } from 'react';
 
 export default function TaskStats() {
-  const { stats, fetchTaskStats } = useTasks();
+  const { stats, fetchTaskStats, error } = useTasks();
 
   useEffect(() => {
     fetchTaskStats();
-  }, []);
-
-  if (!stats) return null;
+  }, [fetchTaskStats]);
 
   const StatCard = ({ title, value, icon, color }) => (
     <div className="bg-gray-800 overflow-hidden shadow rounded-lg">
@@ -34,6 +31,22 @@ export default function TaskStats() {
       </div>
     </div>
   );
+
+  if (error) {
+    return (
+      <div className="text-red-400 text-center p-4">
+        Failed to load task statistics. Please try again later.
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="text-gray-400 text-center p-4">
+        Loading task statistics...
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
