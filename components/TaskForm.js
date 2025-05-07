@@ -9,7 +9,7 @@ import { toast } from 'react-hot-toast'
 import { formatAPIDate } from '../lib/utils'
 
 export default function TaskForm({ task = null }) {
-const { user } = useAuth()
+  const { user } = useAuth()
   const { fetchTasks } = useTasks()
   const router = useRouter()
 
@@ -40,20 +40,24 @@ const { user } = useAuth()
       if (user?.role === 'admin') {
         try {
           const token = localStorage.getItem('token')
-          if (!token) throw new Error('No token found')
-          
-          const response = await axios.get(
-            'https://task-management-backend-2ifw.onrender.com/api/users', 
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              }
-            }
-          )
+          if (!token) {
+            throw new Error('No token found in localStorage')
+          }
+          const response = await axios.get('https://task-management-backend-2ifw.onrender.com/api/users', {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+          })
           setUsers(response.data)
         } catch (error) {
-          console.error('Fetch users error:', error)
+          console.error('Fetch users error:', {
+            message: error.message,
+            response: error.response ? {
+              status: error.response.status,
+              data: error.response.data,
+            } : null,
+          })
           toast.error('Failed to fetch users')
         }
       }
@@ -68,16 +72,35 @@ const { user } = useAuth()
   }
 
   const validateForm = () => {
-    if (!formData.title.trim()) {
-      toast.error('Title is required')
+    const { title, dueDate, priority, status, assignedTo } = formData
+    if (!title.trim()) {
+      toast.error("Title is required")
       return false
     }
-    if (!formData.dueDate) {
-      toast.error('Due date is required')
+    if (!dueDate) {
+      toast.error("Due Date is required")
       return false
     }
-    if (isNaN(new Date(formData.dueDate).getTime())) {
-      toast.error('Invalid due date')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      toast.error("Due Date must be in YYYY-MM-DD format")
+      return false
+    }
+    try {
+      formatAPIDate(dueDate) // Throws if invalid
+    } catch (error) {
+      toast.error("Due Date is invalid")
+      return false
+    }
+    if (!['low', 'medium', 'high'].includes(priority)) {
+      toast.error("Priority must be low, medium, or high")
+      return false
+    }
+    if (!['todo', 'in-progress', 'completed'].includes(status)) {
+      toast.error("Status must be todo, in-progress, or completed")
+      return false
+    }
+    if (user?.role === 'admin' && assignedTo && !/^[0-9a-fA-F]{24}$/.test(assignedTo)) {
+      toast.error("Assigned To must be a valid user")
       return false
     }
     return true
@@ -89,78 +112,94 @@ const { user } = useAuth()
 
     setLoading(true)
 
+    const taskData = {
+      title: formData.title.trim(),
+      ...(formData.description.trim() && { description: formData.description.trim() }),
+      dueDate: formatAPIDate(formData.dueDate), // Ensure YYYY-MM-DD
+      priority: formData.priority,
+      status: formData.status,
+      ...(user?.role === 'admin' && formData.assignedTo && /^[0-9a-fA-F]{24}$/.test(formData.assignedTo) && { assignedTo: formData.assignedTo }),
+    }
+
     try {
       const token = localStorage.getItem('token')
-      if (!token) throw new Error('No authentication token found')
-
-      const taskData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        dueDate: new Date(formData.dueDate).toISOString(),
-        priority: formData.priority,
-        status: formData.status,
-        createdBy: user.id, // Ensure createdBy is included
+      if (!token) {
+        throw new Error('No token found in localStorage')
       }
 
-      if (user?.role === 'admin' && formData.assignedTo) {
-        taskData.assignedTo = formData.assignedTo
+      if (task && !task._id) {
+        throw new Error('Task ID is missing')
       }
+
+      console.log('Raw form data:', formData)
+      console.log('Submitting task request:', {
+        url: task ? `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}` : 'https://task-management-backend-2ifw.onrender.com/api/tasks',
+        method: task ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: taskData,
+        token: token.substring(0, 20) + '...' // Log partial token for security
+      })
 
       const config = {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-        }
+        },
       }
 
-      console.log('Sending task data:', taskData) // Debug log
-
-      const url = task 
-        ? `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}`
-        : 'https://task-management-backend-2ifw.onrender.com/api/tasks'
-
-      const method = task ? 'put' : 'post'
-
-      const response = await axios[method](url, taskData, config)
-
-      if (response.status >= 200 && response.status < 300) {
-        toast.success(`Task ${task ? 'updated' : 'created'} successfully`)
-        await fetchTasks()
-        router.push('/tasks')
+      let response;
+      if (task) {
+        response = await axios.put(
+          `https://task-management-backend-2ifw.onrender.com/api/tasks/${task._id}`,
+          taskData,
+          config
+        )
+        toast.success('Task updated successfully')
       } else {
-        throw new Error(response.data.message || 'Request failed')
+        response = await axios.post(
+          'https://task-management-backend-2ifw.onrender.com/api/tasks',
+          taskData,
+          config
+        )
+        toast.success('Task created successfully')
       }
+      await fetchTasks()
+      router.push('/tasks')
     } catch (error) {
       console.error('API Error Details:', {
         message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
+        response: error.response ? {
+          status: error.response.status,
+          data: error.response.data,
+          errors: error.response.data.errors || null,
+          headers: error.response.headers,
+        } : null,
       })
-
-      let errorMessage = 'Failed to save task'
-      if (error.response?.data?.errors) {
-        errorMessage = error.response.data.errors.map(e => e.msg || e.message).join(', ')
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message
-      } else if (error.message) {
-        errorMessage = error.message
+      const validationErrors = error?.response?.data?.errors
+      if (validationErrors) {
+        console.log('Validation errors:', JSON.stringify(validationErrors, null, 2))
+      } else {
+        console.log('Raw response data:', JSON.stringify(error?.response?.data, null, 2))
       }
-
+      const errorMessage =
+        validationErrors?.[0]?.msg ||
+        error?.response?.data?.message ||
+        'Failed to save task'
       toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
-
   return (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 dark:text-white">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Title */}
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Title *
-          </label>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title *</label>
           <input
             id="title"
             name="title"
@@ -174,9 +213,7 @@ const { user } = useAuth()
 
         {/* Description */}
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Description
-          </label>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
           <textarea
             id="description"
             name="description"
@@ -191,9 +228,7 @@ const { user } = useAuth()
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {/* Due Date */}
           <div>
-            <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Due Date *
-            </label>
+            <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Date *</label>
             <input
               id="dueDate"
               name="dueDate"
@@ -207,9 +242,7 @@ const { user } = useAuth()
 
           {/* Priority */}
           <div>
-            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Priority
-            </label>
+            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
             <select
               id="priority"
               name="priority"
@@ -225,9 +258,7 @@ const { user } = useAuth()
 
           {/* Status */}
           <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Status
-            </label>
+            <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
             <select
               id="status"
               name="status"
@@ -244,9 +275,7 @@ const { user } = useAuth()
           {/* Assign To (Only Admin) */}
           {user?.role === 'admin' && (
             <div>
-              <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Assign To
-              </label>
+              <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Assign To</label>
               <select
                 id="assignedTo"
                 name="assignedTo"
