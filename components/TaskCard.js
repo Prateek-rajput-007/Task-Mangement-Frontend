@@ -26,7 +26,7 @@ export default function TaskCard({ task }) {
         <div className="flex justify-between items-center">
           <div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              <span className="font-medium">Due:</span> {formatDate(task.dueDate)}
+              <span className="font-medium">Due:</span> {task.dueDate ? formatDate(task.dueDate) : 'N/A'}
             </p>
             {task.assignedTo && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
