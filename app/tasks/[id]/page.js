@@ -198,7 +198,6 @@ export default function TaskDetailPage() {
     if (window.confirm('Are you sure you want to delete this task?')) {
       try {
         await deleteTask(id);
-        toast.success('Task deleted successfully');
         router.push('/tasks');
       } catch (error) {
         console.error('Delete task error:', error);
@@ -207,7 +206,6 @@ export default function TaskDetailPage() {
         if (status === 404) {
           toast.error('Task not found');
         } else if (status === 401) {
-          toast.error('Unauthorized: Please log in again');
           localStorage.removeItem('token');
           router.push('/login');
         } else if (status === 403) {
