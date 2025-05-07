@@ -41,14 +41,18 @@ export default function TaskForm({ task = null }) {
         try {
           const token = localStorage.getItem('token')
           if (!token) {
-            throw new Error('No token found in localStorage')
+            console.error('No token found in localStorage')
+            toast.error('Please log in to fetch users')
+            router.push('/login')
+            return
           }
-          const response = await axios.get('https://task-management-backend-2ifw.onrender.com/api/tasks', {
+          const response = await axios.get('https://task-management-backend-2ifw.onrender.com/api/users', {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
             },
           })
+          console.log('Users fetched:', response.data.length)
           setUsers(response.data)
         } catch (error) {
           console.error('Fetch users error:', {
@@ -58,13 +62,19 @@ export default function TaskForm({ task = null }) {
               data: error.response.data,
             } : null,
           })
-          toast.error('Failed to fetch users')
+          if (error.response?.status === 401) {
+            toast.error('Unauthorized: Please log in again')
+            localStorage.removeItem('token')
+            router.push('/login')
+          } else {
+            toast.error(error.response?.data?.message || 'Failed to fetch users')
+          }
         }
       }
     }
 
     fetchUsers()
-  }, [task, user])
+  }, [task, user, router])
 
   const handleChange = (e) => {
     const { name, value } = e.target
