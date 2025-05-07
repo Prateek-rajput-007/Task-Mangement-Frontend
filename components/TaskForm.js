@@ -30,8 +30,8 @@ export default function TaskForm({ task = null }) {
         title: task.title || '',
         description: task.description || '',
         dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
-        priority: task.priority || 'medium',
-        status: task.status || 'todo',
+        priority: ['low', 'medium', 'high'].includes(task.priority) ? task.priority : 'medium',
+        status: ['todo', 'in-progress', 'completed'].includes(task.status) ? task.status : 'todo',
         assignedTo: task.assignedTo?._id || '',
       })
     }
@@ -43,7 +43,7 @@ export default function TaskForm({ task = null }) {
           if (!token) {
             throw new Error('No token found in localStorage')
           }
-          const response = await axios.get('https://task-management-backend-2ifw.onrender.com/api/users', {
+          const response = await axios.get('https://task-management-backend-2ifw.onrender.com/api/tasks', {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
@@ -68,11 +68,23 @@ export default function TaskForm({ task = null }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    console.log('Form input changed:', { name, value, previous: formData[name] })
+    
+    // Sanitize priority
+    let sanitizedValue = value
+    if (name === 'priority' && !['low', 'medium', 'high'].includes(value)) {
+      console.warn('Invalid priority value detected:', value, 'Reverting to medium')
+      sanitizedValue = 'medium'
+      toast.error('Priority must be low, medium, or high')
+    }
+
+    setFormData(prev => ({ ...prev, [name]: sanitizedValue }))
   }
 
   const validateForm = () => {
     const { title, dueDate, priority, status, assignedTo } = formData
+    console.log('Validating form:', formData)
+    
     if (!title.trim()) {
       toast.error("Title is required")
       return false
@@ -196,7 +208,7 @@ export default function TaskForm({ task = null }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 dark:text-white">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
         {/* Title */}
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title *</label>
@@ -207,6 +219,7 @@ export default function TaskForm({ task = null }) {
             required
             value={formData.title}
             onChange={handleChange}
+            autoComplete="off"
             className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
           />
         </div>
@@ -220,6 +233,7 @@ export default function TaskForm({ task = null }) {
             rows={3}
             value={formData.description}
             onChange={handleChange}
+            autoComplete="off"
             className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
           />
         </div>
@@ -236,6 +250,7 @@ export default function TaskForm({ task = null }) {
               required
               value={formData.dueDate}
               onChange={handleChange}
+              autoComplete="off"
               className="mt-1 block w-full rounded-md py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 sm:text-sm"
             />
           </div>
