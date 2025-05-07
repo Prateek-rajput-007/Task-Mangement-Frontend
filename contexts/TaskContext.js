@@ -220,8 +220,6 @@
 //   return context
 // }
 
-
-
 'use client'
 
 import { createContext, useContext, useState, useEffect } from 'react'
@@ -238,9 +236,8 @@ export function TaskProvider({ children }) {
   const [selectedTask, setSelectedTask] = useState(null)
   const [error, setError] = useState(null)
 
-  // Demo data for stats
-  const useDemoData = process.env.NEXT_PUBLIC_USE_DEMO_DATA === 'true';
-  const demoStats = {
+  // Mock stats data
+  const mockStats = {
     total: 8,
     completed: 3,
     overdue: 1
@@ -276,24 +273,16 @@ export function TaskProvider({ children }) {
     try {
       setLoading(true)
       setError(null)
-      let data;
-      if (useDemoData) {
-        console.log('Using demo stats data:', demoStats);
-        data = demoStats;
-      } else {
-        const response = await api.get('/tasks/stats')
-        data = response.data
-      }
-      setStats(data)
-      return data
+      console.log('Using mock stats data:', mockStats);
+      setStats(mockStats)
+      return mockStats
     } catch (error) {
       console.error('Fetch stats error:', {
         message: error.message,
-        status: error.response?.status,
-        data: error.response?.data
+        stack: error.stack
       })
-      setError(error.response?.data?.message || 'Failed to fetch stats')
-      toast.error(error.response?.data?.message || 'Failed to fetch stats')
+      setError('Failed to load task statistics')
+      toast.error('Failed to load task statistics')
       return null
     } finally {
       setLoading(false)
