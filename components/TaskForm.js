@@ -72,7 +72,7 @@ export default function TaskForm({ task = null }) {
   }
 
   const validateForm = () => {
-    const { title, dueDate, priority, status } = formData
+    const { title, dueDate, priority, status, assignedTo } = formData
     if (!title.trim()) {
       toast.error("Title is required")
       return false
@@ -85,8 +85,9 @@ export default function TaskForm({ task = null }) {
       toast.error("Due Date must be in YYYY-MM-DD format")
       return false
     }
-    const date = new Date(dueDate)
-    if (isNaN(date.getTime())) {
+    try {
+      formatAPIDate(dueDate) // Throws if invalid
+    } catch (error) {
       toast.error("Due Date is invalid")
       return false
     }
@@ -96,6 +97,10 @@ export default function TaskForm({ task = null }) {
     }
     if (!['todo', 'in-progress', 'completed'].includes(status)) {
       toast.error("Status must be todo, in-progress, or completed")
+      return false
+    }
+    if (user?.role === 'admin' && assignedTo && !/^[0-9a-fA-F]{24}$/.test(assignedTo)) {
+      toast.error("Assigned To must be a valid user")
       return false
     }
     return true
@@ -113,7 +118,7 @@ export default function TaskForm({ task = null }) {
       dueDate: formatAPIDate(formData.dueDate), // Ensure YYYY-MM-DD
       priority: formData.priority,
       status: formData.status,
-      ...(user?.role === 'admin' && formData.assignedTo && formData.assignedTo !== '' && { assignedTo: formData.assignedTo }),
+      ...(user?.role === 'admin' && formData.assignedTo && /^[0-9a-fA-F]{24}$/.test(formData.assignedTo) && { assignedTo: formData.assignedTo }),
     }
 
     try {
@@ -172,8 +177,12 @@ export default function TaskForm({ task = null }) {
           headers: error.response.headers,
         } : null,
       })
+      const validationErrors = error?.response?.data?.errors
+      if (validationErrors) {
+        console.log('Validation errors:', JSON.stringify(validationErrors, null, 2))
+      }
       const errorMessage =
-        error?.response?.data?.errors?.[0]?.msg ||
+        validationErrors?.[0]?.msg ||
         error?.response?.data?.message ||
         'Failed to save task'
       toast.error(errorMessage)
